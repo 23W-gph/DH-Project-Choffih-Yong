@@ -1,0 +1,136 @@
+---
+title: "Test Table"
+author: "Choffih.Yong"
+date: "2024-02-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+pacman::p_load(
+  rio,
+  here,
+  dplyr,
+  tidyverse,
+  readr,
+  styler,
+  janitor)
+  
+install.packages("ggplot2")
+install.packages("ggpubr")
+install.packages("flextable")
+
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(ggpubr)
+
+#importing csv data in R
+mydata <- read_csv("data/sexual violence.csv",
+          col_types = cols(id = col_skip(), 
+          age = col_integer()))
+
+
+#overview of data
+View(mydata)
+head(mydata)
+summary(mydata)
+str(mydata)
+colnames(mydata)
+
+#columns to change type after mutating
+cols_fac = c("gender","marital_status","case_def","age_category")
+cols_log = c("assault_abuse","rape","sought_help","adult")
+
+
+#converting all characters to lowercase
+colnames(mydata) <- tolower(colnames(mydata))
+mydata[] <- lapply(mydata, function(x) if(is.character(x)) tolower(x) else x)
+
+#Converting gender from character to factor type variable
+mydata <- mydata %>% mutate(
+  gender = case_when(
+    gender == "male" ~ "m",
+    gender == "female" ~ "f"))
+mydata <- mydata %>% mutate(
+  gender = factor(gender))
+
+#converting marital status to factor type variable
+mydata <- mydata %>% mutate(
+  marital_status = factor(marital_status))
+
+#Converting to logical type variable
+mydata <- mydata %>% mutate(
+  `sought help` = as.logical(`sought help` == "yes"))
+mydata <- mydata %>% mutate(
+  `assault/abuse` = as.logical(`assault/abuse` == "yes"))
+mydata <- mydata %>% mutate(rape = as.logical(rape == "yes"))
+ 
+# Rename columns
+mydata <- mydata %>%
+  rename(sought_help = `sought help`)
+mydata <- mydata %>%
+  rename(assault_abuse = `assault/abuse`)
+
+#Case definition
+mydata <- mydata %>% mutate(case_def = case_when(
+  assault_abuse == TRUE & sought_help == FALSE  ~ "confirmed case",
+  rape == TRUE & sought_help == FALSE           ~ "confirmed case",
+  TRUE                                          ~ "to investigate"
+))
+
+#checking for and removing missing variable rows
+any(is.na(mydata))
+
+#removing duplicate data
+data <- unique(data)
+
+#creating age_unit column
+data <- data %>%
+  mutate(age_unit = "years")%>%
+  relocate(age_unit, .after = 4)
+
+#creating age category column
+age_breaks <- c(0, 18, 30, 50, 70)
+data <- data %>%
+  mutate(age_category = cut(age, breaks = age_breaks, labels = c("0-18",
+                                                                 "19-30", 
+                                                                 "31-50",
+                                                                 "51-70")))
+
+#creating column to classify adults
+data <- data %>%
+  mutate(adult = ifelse(age > 17, TRUE,FALSE)) 
+
+#converting to factors
+data <- data %>% mutate(
+  case_def = factor(case_def))
+data <- data %>% mutate(
+  age_category = factor(age_category))
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Age Table
+
+```{r age_table, echo=FALSE}
+data %>%
+  tabyl(age_category,gender) %>%
+  adorn_totals(where = "both") %>%
+  adorn_percentages(denominator ="col") %>%
+  adorn_pct_formatting() %>%
+  adorn_ns(position = "front") %>%
+  adorn_title(row_name = "Age Category",
+              col_name = "Gender")
+  flextable::flextable()
+
+```
+
+## Case Distribution by Gender
+
+```{r ll_by_case_def, echo=FALSE}
+ll_by_case_def <- data %>%
+     group_by(gender,case_def) %>%
+     tally() 
+ggplot(ll_by_case_def, aes(x=gender, y=n, fill=case_def)) + geom_col()
+
+```

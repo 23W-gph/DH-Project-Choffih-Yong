@@ -1,0 +1,158 @@
+---
+title: "Visualizing Sexual Violence CSV data in R"
+author: "Choffih.Yong Elizebeth"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(
+  rio,
+  here,
+  dplyr,
+  tidyverse,
+  readr,
+  styler,
+  janitor)
+  
+install.packages("ggplot2")
+install.packages("ggpubr")
+install.packages("flextable")
+
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(ggpubr)
+
+#importing csv data in R
+mydata <- read_csv("data/sexual violence.csv",
+          col_types = cols(id = col_skip(), 
+          age = col_integer()))
+
+
+#overview of data
+View(mydata)
+head(mydata)
+summary(mydata)
+str(mydata)
+colnames(mydata)
+
+#columns to change type after mutating
+cols_fac = c("gender","marital_status","case_def","age_category")
+cols_log = c("assault_abuse","rape","sought_help","adult")
+
+
+#converting all characters to lowercase
+colnames(mydata) <- tolower(colnames(mydata))
+mydata[] <- lapply(mydata, function(x) if(is.character(x)) tolower(x) else x)
+
+#Converting gender from character to factor type variable
+mydata <- mydata %>% mutate(
+  gender = case_when(
+    gender == "male" ~ "m",
+    gender == "female" ~ "f"))
+mydata <- mydata %>% mutate(
+  gender = factor(gender))
+
+#converting marital status to factor type variable
+mydata <- mydata %>% mutate(
+  marital_status = factor(marital_status))
+
+#Converting to logical type variable
+mydata <- mydata %>% mutate(
+  `sought help` = as.logical(`sought help` == "yes"))
+mydata <- mydata %>% mutate(
+  `assault/abuse` = as.logical(`assault/abuse` == "yes"))
+mydata <- mydata %>% mutate(rape = as.logical(rape == "yes"))
+ 
+# Rename columns
+mydata <- mydata %>%
+  rename(sought_help = `sought help`)
+mydata <- mydata %>%
+  rename(assault_abuse = `assault/abuse`)
+
+#Case definition
+mydata <- mydata %>% 
+  mutate(case_def = case_when(
+  assault_abuse == TRUE & sought_help == FALSE  ~ "confirmed case",
+  rape == TRUE & sought_help == FALSE           ~ "confirmed case",
+  TRUE                                          ~ "to investigate"
+))
+
+View(mydata)
+#checking and replacing missing data
+any(is.na(mydata))
+mydata$gender[is.na(mydata$gender)] <- NA
+
+View(mydata)
+
+#checking and removing duplicate data
+data <- unique(mydata)
+
+#creating age_unit column
+data <- data %>%
+  mutate(age_unit = "years")%>%
+  relocate(age_unit, .after = 4)
+
+#creating age category column
+age_breaks <- c(0, 18, 30, 50, 70)
+data <- data %>%
+  mutate(age_category = cut(age, breaks = age_breaks, labels = c("0-18",
+                                                                 "19-30", 
+                                                                 "31-50",
+                                                                 "51-70")))
+
+#creating column to classify adults
+data <- data %>%
+  mutate(adult = ifelse(age > 17, TRUE,FALSE)) 
+
+#converting to factors
+data <- data %>% mutate(
+  case_def = factor(case_def))
+data <- data %>% mutate(
+  age_category = factor(age_category))
+
+```
+
+## SEXUAL VIOLENCE 
+“Any sexual act or an attempt to obtain a sexual act,unwanted sexual comments, or advances, acts to traffic or otherwise directed, against a person's sexuality using coercion, by any person regardless of their relationship to the victim in any setting, including but not limited to home and work.” (WHO, 2002) It involves rape, sexual assault, sexual abuse, sexual harassment, sexual exploitation.
+  Rape is physically forced or otherwise coerced penetration– even if slight – of the vulva or anus, using a penis, other body parts or an object.
+Sexual assault: any sexual contact or behaviour that occurs without explicit consent of the victim. This include fondling, attempted rape, rape, forced sexual acts like oral and anal penetration.
+Sexual abuse involves sexual acts with children, mentally ill persons, and against the elderly.Sexual harassmentinvolved Unwanted sexual advances including demanding sex in return for favours.
+Sexual exploitation involves forced prostitution and trafficking of people for sex purposes.
+  Many women do not report sexual violence to police because they are ashamed, or fear being blamed, not believed or otherwise mistreated especially in cultures that foster beliefs of perceived male superiority and social and cultural inferiority of women (Kalra et al, 3013) There exist Scanty and fragmented data concerning sexual violence thus the difficulty in identifying and management of victims of sexual violence
+  Consequently, victims suffer life long medical and psychological disorders related to the incidence like STIs, pregnancy, depression, anxiety, post traumatic stress disorder etc. 
+
+
+## AGE TABLE
+```{r age_table, echo=FALSE}
+ age_table <- data %>%
+  tabyl(age_category,gender) %>%
+  adorn_totals(where = "both") %>%
+  adorn_percentages(denominator ="col") %>%
+  adorn_pct_formatting() %>%
+  adorn_ns(position = "front") %>%
+  adorn_title(row_name = "Age Category",
+              col_name = "Gender")
+
+ggtexttable(age_table)
+flextable::flextable_html_dependency()
+```
+
+
+## CHARTS OF GENDER AND AGE DISTRIBUTION WITH CASE DEFINITION 
+
+```{r pressure, echo=FALSE}
+ll_by_case_def <- data %>%
+     group_by(gender,case_def) %>%
+     tally() 
+ggplot(ll_by_case_def, aes(x=gender, y=n, fill=case_def)) + geom_col()
+
+age_class_def <- data %>%
+  group_by(age_class = ifelse(adult, "adult", "child")) %>%
+  tally(sort=T) 
+ggplot(age_class_def, aes(x=age_class, y=n)) + geom_col()
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

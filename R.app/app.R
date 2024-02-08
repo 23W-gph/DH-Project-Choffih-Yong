@@ -5,8 +5,9 @@ pacman::p_load(
   shinylive
 )
 
-library(shiny)
+chooseCRANmirror()
 
+library(shiny)
 source("E:/Deggendorf/GPH Class Lectures/Digital health/DH proj/DH-Project/DH-Project-Choffih-Yong/cleandata.R")
 
 # Define UI for application that draws a histogram
@@ -36,7 +37,7 @@ ui <- fluidPage(
       tags$li(tag$b("submitted_date"), "- January 10,2024"),
       tags$li(tag$b("Region"), "- Littoral "),
       tags$li(tag$b("District"), "  Mbanga "),
-      tags$li(tag$b("cases_reported"), "- 358 Confirmed cases "),
+      tags$li(tag$b("cases_reported"), "- 358 Confirmed cases ")
       
     )
   )
@@ -49,7 +50,7 @@ server <- function(input, output) {
   })
   
     ggplot(age_class_def, aes(x=age_class,y=n)) + geom_col()
-  }
+  
     output$ll_by_case_def <- renderPlot({ 
     ll_by_case_def <- filtered_data %>%
       group_by(gender,case_def) %>%
@@ -69,6 +70,9 @@ server <- function(input, output) {
     ggtexttable(age_table)
     
   })
+}
+    
+shinylive::export(appdir = "./", format = "html")
 
 # Run the application 
 shinyApp(ui = ui, server = server)
